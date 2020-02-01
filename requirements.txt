@@ -1,0 +1,8 @@
+tensorflow
+pandas
+numpy
+networkx
+matplotlib
+h5py
+pycairo
+
