@@ -3,9 +3,12 @@ from .utils import export
 from .types import TensorRef
 
 import tensorflow as tf
+import pandas as pd
+from tqdm import tqdm
 
-from typing import Tuple, Sequence, List, Optional, Union, Callable
+from typing import Tuple, Sequence, List, Optional, Union, Callable, Dict, Any
 import abc
+from datetime import datetime
 from itertools import chain
 import itertools
 from contextlib import contextmanager, nullcontext
@@ -135,6 +138,7 @@ class Model:
 
         self.runtime_context = {}
         self._current_mode = None
+        self._current_history_rec = None
 
         # Variable storing the active gradient tape, to be used by stop_gradient_tape()
         self._current_gradient_tape = None
@@ -149,10 +153,11 @@ class Model:
 
     def reset(self):
         """
-        Reset the runtime context.
+        Reset the runtime context and the history record.
         :return:
         """
         self.runtime_context = {}
+        self._current_history_rec = {}
 
     def add(self, entity: Entity):
         """
@@ -219,6 +224,11 @@ class Model:
             raise ModelException()
         return trainable_vars
 
+    def update_history_rec(self, updates: Dict[str, Any]):
+        history = self._current_history_rec
+        if history is not None:
+            history.update(updates)
+
     def compute_grad(self, loss: TensorRef = None) -> List[Tuple[tf.Tensor, tf.Variable]]:
         """
         Compute the layer's gradient and get a list of tuples (tensor, variable) compatible with the optimizer
@@ -241,7 +251,7 @@ class Model:
                 self._current_gradient_tape = None
         assert not reduce_any_nan(loss)
 
-        print(f'loss: {loss}')
+        self.update_history_rec({'loss': float(loss)})
 
         grads = g.gradient(target=loss, sources=trainable_vars)
         return list(zip(grads, trainable_vars))
@@ -252,14 +262,20 @@ class Model:
             return factory()
         return tf.summary.create_noop_writer()
 
-    def _fit(self, steps: int, loss: Optional[TensorRef], optimizer, callbacks: List[Callback]):
+    def _get_step_display_info(self):
+        return OrderedDict((key, self._current_history_rec.get(key)) for key in ('step', 'loss'))
+
+    def _fit(self, steps: int, loss: Optional[TensorRef], optimizer, callbacks: List[Callback]) -> pd.DataFrame:
         for c in callbacks:
             c.init(model=self)  # TODO reset (representing the start of a trial)
 
+        history = []
         summary_writer = self._get_summary_writer()  # TODO Optionally get from function params
         with summary_writer.as_default():
-            for k in range(steps):
+            iterator = tqdm(range(steps), desc='fit')
+            for k in iterator:
                 self.reset()
+                self._current_history_rec.update({'step': k, 'datetime': datetime.now()})
 
                 self.current_step = k
                 tf.summary.experimental.set_step(k)
@@ -269,6 +285,7 @@ class Model:
                 grads = self.compute_grad(loss=loss)
                 invalid_grads = list(filter(lambda item: reduce_any_nan(item[0]), grads))
                 assert len(invalid_grads) == 0
+                iterator.set_postfix(ordered_dict=self._get_step_display_info())
 
                 with tf.name_scope('grads'):
                     for pair in grads:
@@ -278,18 +295,24 @@ class Model:
 
                 for c in callbacks:
                     c.on_training_step_end()
+
+                history.append(self._current_history_rec.copy())
+
         summary_writer.flush()
-        pass
+        history = pd.DataFrame.from_records(history)
+        history.set_index('step', drop=False)
+        return history
 
     def fit(self, steps, *, loss: Optional[TensorRef] = None, optimizer,
-            callbacks: Union[List[Callback], Callback, None] = None):
+            callbacks: Union[List[Callback], Callback, None] = None) -> pd.DataFrame:
         """
-        Run the "training" (fitting) algorithm.
+        Run the "training" (fitting) algorithm. During the process the active model
+        (the one returned by get_active_model()) is set to the current Model instance.
         :param steps: The number of iterations.
         :param loss: A tensor ref of the loss function.
         :param optimizer: The optimizer object, it must support the call apply_gradients.
         :param callbacks: A callback or a list of callbacks.
-        :return:
+        :return: A Pandas DataFrame containing the history of the optimization process.
         """
         if callbacks is None:
             callbacks = []
@@ -310,11 +333,13 @@ class Model:
         try:
             self._current_mode = 'training'
             with self.as_active():
-                self._fit(steps=steps, loss=loss, optimizer=optimizer, callbacks=callbacks)
+                ret = self._fit(steps=steps, loss=loss, optimizer=optimizer, callbacks=callbacks)
         finally:
             self._current_mode = prev_mode
             self.reset()
             tf.summary.experimental.set_step(None)
+
+        return ret
 
 
 @export

@@ -5,4 +5,5 @@ networkx
 matplotlib
 h5py
 pycairo
+tqdm
 

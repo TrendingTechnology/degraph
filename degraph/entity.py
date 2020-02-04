@@ -731,6 +731,9 @@ class SummaryBase(Entity):
             with scope_ctx:
                 self.fun(value, name)
 
+        if tf.rank(value) == 0:
+            model.update_history_rec({self.scope: float(value)})
+
 
 @export
 def summary_histogram(var: TensorRef, *, scope: str, name=None):

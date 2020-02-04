@@ -94,7 +94,7 @@ def test1(output_path: str, log_raster: bool = False):
         # Create optimizer (SGD)
         optimizer = tf.keras.optimizers.SGD(learning_rate=1e-1, decay=2., momentum=0.9, clipnorm=1.0)
         # Run the fitting
-        model.fit(1000, loss=loss, optimizer=optimizer, callbacks=callbacks)
+        history = model.fit(1000, loss=loss, optimizer=optimizer, callbacks=callbacks)
     except AssertionError:
         traceback.print_exc()
 
@@ -103,5 +103,5 @@ def test1(output_path: str, log_raster: bool = False):
 
 
 # Please set the preferred output path
-test1(output_path='/tmp/', log_raster=True)
+test1(output_path=os.path.expanduser('~/tmp/degraph-output'), log_raster=True)
 
