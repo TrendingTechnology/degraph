@@ -1,12 +1,11 @@
 import degraph as dg
 from degraph.cairo_plot import StatusPlotter
-
 import tensorflow as tf
-import os
-import uuid
-import traceback
 import networkx as nx
 
+import os
+import traceback
+from datetime import datetime
 
 RASTER_SHAPE = (200, ) * 2      # Shape of the raster image where the RBF are plotted
 
@@ -16,8 +15,8 @@ def create_summary_writer_factory(output_path: str):
     Create summary writer for Tensorboard.
     :return:
     """
-    path = os.path.join(output_path, f"log-{uuid.uuid4()}")
-    print(f"log path: {path}")
+    path = os.path.join(output_path, f"logs")
+    print(f"logs path: {path}")
 
     def fun():
         return tf.summary.create_file_writer(path)
@@ -55,9 +54,6 @@ def path_length_loss(edges: tf.Tensor):
 def test1(output_path: str, log_raster: bool = False):
     graph = dg.GraphRepr(adjacency=create_sample_graph(), dim=len(RASTER_SHAPE))    # Create graph
 
-    plotter = StatusPlotter(graph=graph, path_prefix=os.path.join(output_path, 'step'))
-    plotter(index='init')   # Plot init state
-
     model = dg.Model()
     with model.as_active():
         # Create entity representing edges
@@ -85,12 +81,17 @@ def test1(output_path: str, log_raster: bool = False):
         loss = dg.reduce_sum(losses.values(), name='loss')  # Aggregate the individual losses
         dg.summary_scalar(loss, scope='metrics.loss')       # Summarise the overall loss on Tensorboard
 
-    model.summary_writer_factory = create_summary_writer_factory(output_path)
+    fit_session = datetime.now().strftime('%Y%m%d%H%m%S')
+    print(f'Current fit session: {fit_session}')
+    plotter = StatusPlotter(graph=graph, path_prefix=os.path.join(output_path, fit_session, 'step'))
+    model.summary_writer_factory = create_summary_writer_factory(os.path.join(output_path, fit_session))
     callbacks = [
         dg.callback.SnapshotCallback(plotter, interval=5),  # Snapshot callback, plot the status every X seconds
     ]
 
     try:
+        plotter(index='init')  # Plot init state
+
         # Create optimizer (SGD)
         optimizer = tf.keras.optimizers.SGD(learning_rate=1e-1, decay=2., momentum=0.9, clipnorm=1.0)
         # Run the fitting

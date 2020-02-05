@@ -6,4 +6,5 @@ matplotlib
 h5py
 pycairo
 tqdm
-
+matplotlib
+pillow

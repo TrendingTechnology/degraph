@@ -27,7 +27,7 @@ the graphical entities. Here is an example of RBF network representing a graph.
 
 The platform is highly customizable, specifically the components of the graph are represented as entities
 (see [entity.py](degraph/entity.py)) that can be connected in different configurations,
-a simple example is available [here](examples/test1.py).
+a simple example is available [here](model1.ipynb).
 Tensorboard is also supported, here is an example output.
 
 ![](doc/images/tb-example.png)
