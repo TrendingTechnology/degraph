@@ -1,13 +1,15 @@
 import degraph as dg
-from degraph.cairo_plot import StatusPlotter
+from degraph.plot import plot_matplt
 import tensorflow as tf
 import networkx as nx
-
+import matplotlib
+import matplotlib.pyplot as plt
 import os
 import traceback
 from datetime import datetime
 
-RASTER_SHAPE = (200, ) * 2      # Shape of the raster image where the RBF are plotted
+matplotlib.use("Agg")
+RASTER_SHAPE = (128, ) * 3      # Shape of the raster image where the RBF are plotted
 
 
 def create_summary_writer_factory(output_path: str):
@@ -51,6 +53,24 @@ def path_length_loss(edges: tf.Tensor):
     return lengths
 
 
+def create_matplt_plotter(graph: dg.GraphRepr, path_prefix: str):
+    def fun(index=None):
+        if index is None:
+            model = dg.get_active_model()
+            if model:
+                index = model.current_step
+
+        if isinstance(index, int):
+            index = "{:05d}".format(index)
+
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        plot_matplt(graph, ax=ax)
+        ax.autoscale()
+        fig.savefig(f'{path_prefix}_plot_{index}.png')
+    return fun
+
+
 def test1(output_path: str, log_raster: bool = False):
     graph = dg.GraphRepr(adjacency=create_sample_graph(), dim=len(RASTER_SHAPE))    # Create graph
 
@@ -67,7 +87,7 @@ def test1(output_path: str, log_raster: bool = False):
         ], bias=-1.)
 
         if log_raster:
-            dg.summary_image(raster, scope='raster')
+            # dg.summary_image(raster, scope='raster')
             dg.summary_histogram(raster, scope='raster_histo')
 
         # Loss contributions
@@ -84,9 +104,9 @@ def test1(output_path: str, log_raster: bool = False):
     fit_session = datetime.now().strftime('%Y%m%d%H%m%S')
     print(f'Current fit session: {fit_session}')
     session_path = os.path.join(output_path, fit_session)
-    os.mkdir(session_path)  # TODO replicate the same in the notebook
+    os.mkdir(session_path)
 
-    plotter = StatusPlotter(graph=graph, path_prefix=os.path.join(session_path, 'step'))
+    plotter = create_matplt_plotter(graph, path_prefix=os.path.join(session_path, 'step'))
     model.summary_writer_factory = create_summary_writer_factory(session_path)
     callbacks = [
         dg.callback.SnapshotCallback(plotter, interval=5),  # Snapshot callback, plot the status every X seconds

@@ -336,7 +336,7 @@ def random_uniform_hypersphere(size, dim) -> tf.Tensor:
     if dim == 3:
         # TODO implement: http://mathworld.wolfram.com/SpherePointPicking.html
         warnings.warn('Sphere point picking is not implemented properly')
-        return tf.random.uniform(shape=(size, dim), dtype=TF_FLOAT)
+        return tf.random.uniform(shape=(size, dim), dtype=TF_FLOAT) * 2.0 - 1.
     raise ValueError(f'Unsupported space dimension: {dim}')
 
 
