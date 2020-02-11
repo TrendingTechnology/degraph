@@ -1,11 +1,13 @@
 from .config import TF_FLOAT, EPSILON
 from .types import RankStaticShape, RBF
 
-from typing import Union, Callable, List, Sequence
+from typing import Union, Callable, List, Sequence, Optional
 import warnings
+from contextlib import nullcontext
 
 import tensorflow as tf
 import numpy as np
+from sklearn.neighbors import KDTree
 
 
 def reduce_any_nan(t: tf.Tensor) -> tf.Tensor:
@@ -366,4 +368,48 @@ def piecewise_linear_curve_closest_pts(curve_pts, centers) -> tf.Tensor:
         # sq_distances.shape=(center_count, pt_count-1)
 
         return sq_distances
+
+
+def _stop_gradient_tape(gradient_tape: tf.GradientTape):
+    if gradient_tape is None:
+        return nullcontext()
+    return gradient_tape.stop_recording()
+
+
+def apply_neighborhood_op(op: Callable[[tf.Tensor, tf.Tensor], tf.Tensor], points: tf.Tensor, radius: float,
+                          gradient_tape: Optional[tf.GradientTape] = None):
+    """
+    Apply a given operator to the neighborhoods (with respect to a given radius) of each point.
+    The search is KDTree accelerated and the accelerator is excluded from gradient tape.
+    :param op: The operator, it must accept two parameters, namely center and neighborhoods.
+    :param points: A tensor representing the space points.
+    :param radius:
+    :param gradient_tape: The current gradient tape if available, it is used to temporarily stop the recording.
+    :return: A ragged tensor containing the values computed by the operator.
+    """
+    # TODO check point rank
+
+    with _stop_gradient_tape(gradient_tape):
+        pts_np = points.numpy()
+        tree = KDTree(pts_np)
+        nb_idxs = tree.query_radius(pts_np, r=radius)
+        del pts_np
+        nb_idxs = tf.ragged.constant(nb_idxs)
+
+    empty = tf.convert_to_tensor([], dtype=TF_FLOAT)
+
+    def center_nb_dists(center_idx, nb_idxs):
+        # Remove the index corresponding to the center from the list of neighborhood indexes.
+        nb_idxs = tf.boolean_mask(nb_idxs, nb_idxs == center_idx)
+        if len(nb_idxs) == 0:
+            return empty
+        # Compute distances
+        c = points[center_idx]
+        nbs = tf.gather(points, nb_idxs)
+        # return op(tf.reduce_sum(tf.square(nbs - c), -1))
+        return op(c, nbs)
+
+    center_idxs = tf.range(len(points))
+    center_idxs = tf.ragged.range(center_idxs, center_idxs+1)
+    return tf.ragged.map_flat_values(center_nb_dists, center_idxs, nb_idxs)
 

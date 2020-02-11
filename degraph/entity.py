@@ -155,6 +155,11 @@ class RBFNet:
     def create_grid(shape: StaticShape):
         return tf.cast(tf_hgrid_coords(shape), dtype=TF_FLOAT)
 
+    def compute_raster_contrib(self, shape: StaticShape, centres: tf.Tensor):
+        # TODO Compute the local contributions (we need a radius), take advantage of the regular grid.
+        #   substitute to the function __call__.
+        pass
+
     @tf.function
     def __call__(self, shape: StaticShape, centres: tf.Tensor):
         grid = tf.cast(tf.expand_dims(tf_hgrid_coords(shape), axis=1), dtype=TF_FLOAT)
@@ -497,30 +502,6 @@ def unit_sphere_bounds_loss(points_tensor_ref: TensorRef, *, factor: float = 1.0
         # TODO assert rank, support shape [..., dim]
         return factor * tf.reduce_sum(tf.nn.relu(tf.reduce_sum(tf.square(points), axis=-1) - 1.0))
     return lambda_(fun, points_tensor_ref)
-
-
-class VertexDistancesLoss(SingleVarContrib):    # TODO remove, create simple func with lambda
-    def __init__(self, points_tensor_ref: TensorRef, *, factor: float = 1.0, spread: float = 1.0):
-        super().__init__()
-        self.points_tensor_ref = points_tensor_ref
-        self.factor = factor
-        self.spread = spread
-        self.add_to_active_model()
-
-    def get_value(self):
-        if self.factor <= 0.:
-            return 0.
-
-        model = get_active_model()
-        assert model is not None
-        pts = expand_tensor_ref(self.points_tensor_ref)  # TODO assert rank
-
-        # TODO set tf.function here!
-        # Scale to layer coordinates size
-        positions = tf.add(pts, 1.) / 2. * tf.convert_to_tensor(model.shape, dtype=TF_FLOAT)
-        distances = mutual_sq_distances(positions)
-        distances = tf.reduce_sum(gauss_rbf(sq_d=distances, spread=self.spread))
-        return distances * self.factor
 
 
 @export

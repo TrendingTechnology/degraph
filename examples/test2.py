@@ -30,7 +30,7 @@ def create_sample_graph():
     Create a sample graph.
     :return: Return an adjacency matrix.
     """
-    g = nx.balanced_tree(3, 3)
+    g = nx.balanced_tree(3, 4)
     # g = nx.grid_2d_graph(5, 5)
     # g = nx.karate_club_graph()
     m = nx.to_numpy_matrix(g)
