@@ -134,7 +134,7 @@ class Model:
     def __init__(self):
         self._entities_map = OrderedDict()
         self.summary_writer_factory: Optional[tf.summary.SummaryWriter] = None
-        self.current_step = None    # TODO create tensorref?
+        self.current_step = None
 
         self.runtime_context = {}
         self._current_mode = None

@@ -1,5 +1,5 @@
 ## Degraph
-*Degraph* is a demonstrative [differentiable programming](https://en.wikipedia.org/wiki/Differentiable_programming) project.
+*Degraph* is a demo [differentiable programming](https://en.wikipedia.org/wiki/Differentiable_programming) project.
 The main idea is treating the plot of a [graph](https://en.wikipedia.org/wiki/Graph_%28discrete_mathematics%29) as a *differentiable function*.
 The plot is associated with a loss function that represents the goodness of the plotting operation.
 The combination of differentiable representation (differentiable plot) and the loss opens the way to the application of
@@ -18,6 +18,7 @@ is an example of the initial state and the result after the optimization is appl
 | 3D | ![](doc/images/eg2_plot_init.png) | ![](doc/images/eg2_plot_end.png)
 
 
+**TODO include gif**
 Also an animation of the iteration of the optimizer (gradient descent) is available on [youtube](https://youtu.be/vmNoHZ1yCak).
 
 Internally the interactions between the various elements of the graph are represented by a *differentiable raster* (image),

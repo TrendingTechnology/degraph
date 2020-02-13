@@ -10,7 +10,7 @@ class SnapshotCallback(Callback):
     the callback's method on_training_step_end.
     """
 
-    def __init__(self, fun: Callable, interval: Optional[float] = None):
+    def __init__(self, fun: Callable, *, interval: Optional[float] = None):
         """
         Init callback.
         :param fun: The callable to be invoked.
@@ -31,6 +31,34 @@ class SnapshotCallback(Callback):
                     return
             self.last_op = now
         self.fun()
+
+
+class GraphSnapshot(SnapshotCallback):
+    def __init__(self, graph, *, interval: Optional[float] = None):
+        """
+        Init callback.
+        :param graph: The graph to be monitored.
+        :param interval: Optional float value representing the interval in seconds between the snapshots. If None
+        the graph is saved at each step.
+        """
+        super().__init__(fun=self._run, interval=interval)
+        self.graph = graph
+        self.history = []
+
+    def init(self, model):
+        self.reset()
+        super().init(model)
+
+    def reset(self):
+        self.history = []
+
+    def _run(self):
+        graph = self.graph
+        if graph is None:
+            return
+        graph = graph.copy(static=True)
+        model = get_active_model()
+        self.history.append({'step': model.current_step, 'graph': graph})
 
 
 class AlternateTrainingCallback(Callback):
